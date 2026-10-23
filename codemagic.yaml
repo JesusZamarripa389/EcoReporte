@@ -10,19 +10,33 @@ workflows:
     environment:
       xcode: latest
     scripts:
+      - name: Buscar el proyecto
+        script: |
+          # Busca EcoReporte.xcodeproj aunque esté dentro de una subcarpeta
+          PROYECTO=$(find "$CM_BUILD_DIR" -maxdepth 3 -name "EcoReporte.xcodeproj" -type d | head -n 1)
+          if [ -z "$PROYECTO" ]; then
+            echo "ERROR: no se encontró EcoReporte.xcodeproj en el repositorio."
+            echo "Archivos que sí hay en el repositorio:"
+            find "$CM_BUILD_DIR" -maxdepth 3 -not -path "*/.git/*" | head -n 60
+            exit 1
+          fi
+          echo "Proyecto encontrado: $PROYECTO"
+          echo "CARPETA_PROYECTO=$(dirname "$PROYECTO")" >> $CM_ENV
       - name: Compilar para simulador
         script: |
+          cd "$CARPETA_PROYECTO"
+          xcodebuild -list -project EcoReporte.xcodeproj
           xcodebuild build \
             -project EcoReporte.xcodeproj \
             -scheme EcoReporte \
             -configuration Debug \
             -sdk iphonesimulator \
             -destination "generic/platform=iOS Simulator" \
-            -derivedDataPath build \
+            -derivedDataPath "$CM_BUILD_DIR/build" \
             CODE_SIGNING_ALLOWED=NO
       - name: Empaquetar la app
         script: |
-          cd build/Build/Products/Debug-iphonesimulator
+          cd "$CM_BUILD_DIR/build/Build/Products/Debug-iphonesimulator"
           zip -r "$CM_BUILD_DIR/EcoReporte-simulador.zip" EcoReporte.app
     artifacts:
       - EcoReporte-simulador.zip
@@ -42,13 +56,23 @@ workflows:
         distribution_type: development        # development = instalar en iPhones registrados
         bundle_identifier: com.escuela.EcoReporte
     scripts:
+      - name: Buscar el proyecto
+        script: |
+          PROYECTO=$(find "$CM_BUILD_DIR" -maxdepth 3 -name "EcoReporte.xcodeproj" -type d | head -n 1)
+          if [ -z "$PROYECTO" ]; then
+            echo "ERROR: no se encontró EcoReporte.xcodeproj en el repositorio."
+            exit 1
+          fi
+          echo "CARPETA_PROYECTO=$(dirname "$PROYECTO")" >> $CM_ENV
       - name: Configurar la firma
         script: |
           xcode-project use-profiles
       - name: Compilar IPA
         script: |
+          cd "$CARPETA_PROYECTO"
           xcode-project build-ipa \
             --project EcoReporte.xcodeproj \
-            --scheme EcoReporte
+            --scheme EcoReporte \
+            --ipa-directory "$CM_BUILD_DIR/build/ios/ipa"
     artifacts:
       - build/ios/ipa/*.ipa
