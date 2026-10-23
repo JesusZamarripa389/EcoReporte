@@ -1,0 +1,39 @@
+
+workflows:
+  eco-reporte:
+    name: EcoReporte - iOS Simulator
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      xcode: latest
+
+    scripts:
+      - name: Build for iPhone Simulator
+        script: |
+          xcodebuild \
+            -project "$CM_BUILD_DIR/EcoReporte.xcodeproj" \
+            -scheme "EcoReporte" \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug \
+            -derivedDataPath "$CM_BUILD_DIR/build" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Package app
+        script: |
+          APP_PATH="$CM_BUILD_DIR/build/Build/Products/Debug-iphonesimulator/EcoReporte.app"
+
+          if [ ! -d "$APP_PATH" ]; then
+            echo "No se encontró EcoReporte.app"
+            exit 1
+          fi
+
+          cd "$(dirname "$APP_PATH")"
+          ditto -c -k --sequesterRsrc --keepParent \
+            "EcoReporte.app" "$CM_BUILD_DIR/EcoReporte-simulator.zip"
+
+    artifacts:
+      - EcoReporte-simulator.zip
+      - /tmp/xcodebuild_logs/*.log
