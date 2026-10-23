@@ -1,0 +1,54 @@
+workflows:
+
+  # 1) Compila la app para el simulador.
+  #    No necesita cuenta de Apple ni certificados.
+  #    Sirve para comprobar que el proyecto compila sin errores.
+  ecoreporte-simulador:
+    name: EcoReporte - Compilar (simulador)
+    instance_type: mac_mini_m2
+    max_build_duration: 30
+    environment:
+      xcode: latest
+    scripts:
+      - name: Compilar para simulador
+        script: |
+          xcodebuild build \
+            -project EcoReporte.xcodeproj \
+            -scheme EcoReporte \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "generic/platform=iOS Simulator" \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO
+      - name: Empaquetar la app
+        script: |
+          cd build/Build/Products/Debug-iphonesimulator
+          zip -r "$CM_BUILD_DIR/EcoReporte-simulador.zip" EcoReporte.app
+    artifacts:
+      - EcoReporte-simulador.zip
+
+  # 2) Genera un archivo .ipa firmado para instalar en un iPhone.
+  #    Necesita una cuenta de Apple Developer y una llave de
+  #    App Store Connect configurada en Codemagic (Teams > Integrations).
+  ecoreporte-ipa:
+    name: EcoReporte - IPA firmada
+    instance_type: mac_mini_m2
+    max_build_duration: 30
+    integrations:
+      app_store_connect: NOMBRE_DE_TU_LLAVE   # cambia esto por el nombre de tu llave
+    environment:
+      xcode: latest
+      ios_signing:
+        distribution_type: development        # development = instalar en iPhones registrados
+        bundle_identifier: com.escuela.EcoReporte
+    scripts:
+      - name: Configurar la firma
+        script: |
+          xcode-project use-profiles
+      - name: Compilar IPA
+        script: |
+          xcode-project build-ipa \
+            --project EcoReporte.xcodeproj \
+            --scheme EcoReporte
+    artifacts:
+      - build/ios/ipa/*.ipa
